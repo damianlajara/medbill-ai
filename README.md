@@ -39,7 +39,9 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/bui
 
 # Documentation/Instructions + Things left to do/improve on
 
-## Getting Started
+## Take Home for Medbill AI
+* [Medbill AI Homepage](https://medbill.ai/)
+* [Exercise Link](https://medbill-ai.notion.site/Dynamic-AI-Form-Frontend-Implementation-1be8c18b546847a2b9d79d2d3776a006)
 
 ### Things that need more attention: 
 * Component Structure. For the lack of time, I was not able to make them as modular as I wanted to. I would've loved to have everything be it's own component (ThankYou screen, each input, footer etc).
