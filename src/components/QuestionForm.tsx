@@ -3,16 +3,18 @@
 import { useForm, Controller } from 'react-hook-form';
 import { useState } from 'react';
 import { Question } from '@/types/question';
-import { fetchNextQuestion } from '@/requests/question';
-import { validateAnswer } from '@/requests/validate';
-import { submitQuestion } from '@/requests/submit';
-
-type FormValues = {
-  answer: string | string[];
-};
+import { fetchFirstQuestion, fetchNextQuestion } from '@/requests/question';
+import { submitAnswer, validateAnswer } from '@/requests/answer';
+import ThankYou from '@/components/ThankYou';
+import FormActions from '@/components/FormActions';
+import QuestionInput from '@/components/QuestionInput';
+import QuestionMultipleChoice from '@/components/QuestionMultipleChoice';
+import { FormValues } from '@/types/form';
 
 export default function QuestionForm() {
-  const [history, setHistory] = useState<Question[]>([]);
+  const [history, setHistory] = useState<
+    { question: Question; answer: FormValues['answer'] }[]
+  >([]);
   const [current, setCurrent] = useState<Question | null>(null);
   const [completed, setCompleted] = useState(false);
 
@@ -35,18 +37,21 @@ export default function QuestionForm() {
   });
 
   const loadInitialQuestion = async () => {
-    // TODO: Figure out a better way on how to load the first question
-    const first = await fetchNextQuestion({ questionId: 'q1' });
-    if (first) {
-      setCurrent(first);
-      if (first.prepopulate) {
-        setValue(
-          'answer',
-          first.type === 'multiple_choice' && first.multiple
-            ? first.prepopulate ?? []
-            : (first.prepopulate as string),
-        );
+    try {
+      const first = await fetchFirstQuestion();
+      if (first) {
+        setCurrent(first);
+        if (first.prepopulate) {
+          setValue(
+            'answer',
+            first.type === 'multiple_choice' && first.multiple
+              ? first.prepopulate ?? []
+              : (first.prepopulate as string),
+          );
+        }
       }
+    } catch (error) {
+      console.error('Error fetching first question:', error);
     }
   };
 
@@ -61,7 +66,7 @@ export default function QuestionForm() {
         return;
       }
 
-      const nextQuestionID = await submitQuestion({
+      const nextQuestionID = await submitAnswer({
         questionId: current.id,
         answer: data.answer,
       });
@@ -77,7 +82,11 @@ export default function QuestionForm() {
         questionId: nextQuestionID,
       });
 
-      setHistory((prev) => [...prev, current]);
+      setHistory((prev) => [
+        ...prev,
+        { question: current, answer: data.answer },
+      ]);
+
       setCurrent(next);
       reset(); // reset form for the next question
 
@@ -104,14 +113,19 @@ export default function QuestionForm() {
     const prev = [...history];
     const last = prev.pop();
     setHistory(prev);
-    setCurrent(last || null);
+    setCurrent(last?.question || null);
     reset();
-    if (last?.prepopulate) {
+
+    // If we have an answer, use it. Otherwise, prepopulate the form
+    if (last?.answer) {
+      setValue('answer', last.answer);
+    } else if (last?.question?.prepopulate) {
+      const { question } = last;
       setValue(
         'answer',
-        last.type === 'multiple_choice' && last.multiple
-          ? last.prepopulate ?? []
-          : (last.prepopulate as string),
+        question.type === 'multiple_choice' && question.multiple
+          ? question.prepopulate ?? []
+          : (question.prepopulate as string),
       );
     }
   };
@@ -128,14 +142,7 @@ export default function QuestionForm() {
   }
 
   if (completed) {
-    return (
-      <div className="shadow-md rounded-xl p-12 bg-white flex flex-col items-center justify-center gap-4">
-        <h2 className="text-2xl font-semibold">Thank you!</h2>
-        <p className="text-md text-gray-600">
-          You have completed the questionnaire.
-        </p>
-      </div>
-    );
+    return <ThankYou />;
   }
 
   return (
@@ -154,13 +161,7 @@ export default function QuestionForm() {
         <Controller
           name="answer"
           control={control}
-          render={({ field }) => (
-            <input
-              type="text"
-              {...field}
-              className="w-full border-0 border-b-2 border-teal-300 focus:border-teal-500 hover:border-teal-400 focus:outline-none transition duration-200"
-            />
-          )}
+          render={({ field }) => <QuestionInput field={field} />}
         />
       )}
 
@@ -169,70 +170,12 @@ export default function QuestionForm() {
           name="answer"
           control={control}
           render={({ field }) => (
-            <div className="grid grid-cols-1 gap-2">
-              {current.options.map((option) => {
-                const isMulti = current.multiple;
-                const isChecked = isMulti
-                  ? (field.value as string[])?.includes(option)
-                  : field.value === option;
-
-                return (
-                  <label
-                    key={option}
-                    className={`cursor-pointer px-4 py-2 rounded-lg border 
-              text-sm transition duration-200 text-teal-800
-              ${
-                isChecked
-                  ? 'bg-teal-200 border-teal-500'
-                  : 'bg-white border-teal-300 hover:bg-teal-50'
-              }`}
-                  >
-                    <input
-                      type={isMulti ? 'checkbox' : 'radio'}
-                      name="answer"
-                      value={option}
-                      checked={isChecked}
-                      onChange={(e) => {
-                        if (isMulti) {
-                          const newValue = [...(field.value || [])];
-                          if (e.target.checked) {
-                            newValue.push(option);
-                          } else {
-                            const index = newValue.indexOf(option);
-                            if (index > -1) newValue.splice(index, 1);
-                          }
-                          field.onChange(newValue);
-                        } else {
-                          field.onChange(option);
-                        }
-                      }}
-                      className="sr-only"
-                    />
-                    <span>{option}</span>
-                  </label>
-                );
-              })}
-            </div>
+            <QuestionMultipleChoice field={field} current={current} />
           )}
         />
       )}
 
-      <div className="flex justify-between pt-4">
-        <button
-          type="button"
-          onClick={goBack}
-          disabled={history.length === 0}
-          className="bg-gray-300 px-4 py-2 rounded-lg"
-        >
-          Back
-        </button>
-        <button
-          type="submit"
-          className="bg-green-500 text-white px-4 py-2 rounded-lg"
-        >
-          Next
-        </button>
-      </div>
+      <FormActions goBack={goBack} isDisabled={history.length === 0} />
     </form>
   );
 }

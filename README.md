@@ -77,6 +77,6 @@ Note: I did leave a couple of TODO comments in the code as well - so I'm sure th
 * There is only one route (`/`) - since this is a NextJS app, that will correlate to the `app/page.tsx` file
 * components - houses all the components that are imported in the pages (not a lot due to lack of time)
 * data - mocked data to feed our app
-* pages/api - our BE housing API routes. Every nested file in this dir correlates to one API endpoint
+* app/api/<version> - our BE housing API routes. Every nested file in this dir correlates to one API endpoint
 * requests - the FE fetching for each of the api endpoints above
 * types - all of our TS typings
